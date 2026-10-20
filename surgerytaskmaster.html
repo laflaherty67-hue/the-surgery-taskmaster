@@ -1,0 +1,743 @@
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>eCW Outpatient Surgery Scheduling Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        /* Custom scrollbar for data grid */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 text-slate-800">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+        
+        <!-- Header Section -->
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between bg-white p-6 rounded-2xl border border-slate-200 shadow-sm gap-4">
+            <div class="flex items-center gap-3">
+                <div class="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 002-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-slate-900">eClinicalWorks Surgery Scheduling Pipeline</h1>
+                    <p class="text-xs text-slate-500">Outpatient Surgery Pre-Op Clearance & Clearance Tracking</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <button id="addRowBtn" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Patient Row
+                </button>
+                <button id="toggleImportBtn" class="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    Import Data
+                </button>
+                <button id="copySummaryBtn" class="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                    </svg>
+                    Copy Pipeline Data
+                </button>
+            </div>
+        </div>
+
+        <!-- Expandable Text Data Import Panel -->
+        <div id="importPanel" class="hidden bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3 transition-all">
+            <div>
+                <h3 class="text-sm font-bold text-slate-900">Import Pipeline Data</h3>
+                <p class="text-xs text-slate-500">Paste your previously copied "eCW SURGERY PIPELINE CLEAR SUMMARY" string below to reload the grid.</p>
+            </div>
+            <textarea id="importTextArea" rows="4" placeholder="Paste text summary here..." class="w-full text-xs font-mono p-3 border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none bg-slate-50/50"></textarea>
+            <div class="flex justify-end gap-2">
+                <button id="cancelImportBtn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors">Cancel</button>
+                <button id="executeImportBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm">Load Data</button>
+            </div>
+        </div>
+
+        <!-- Clickable KPI Metrics Ribbon -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            <!-- Metric 1: Total Patients -->
+            <div id="kpiCardAll" class="kpi-card bg-white p-5 rounded-2xl border-2 border-indigo-500 shadow-sm flex items-center justify-between cursor-pointer hover:shadow-md transition-all select-none relative">
+                <div class="space-y-1">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Scheduled</span>
+                    <div id="kpiTotalPatients" class="text-3xl font-bold text-slate-900">0</div>
+                    <p id="kpiTotalLabel" class="text-xs text-slate-400">Active Pre-Op Records</p>
+                </div>
+                <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Metric 2: Fully Cleared Cases -->
+            <div id="kpiCardCleared" class="kpi-card bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between cursor-pointer hover:shadow-md transition-all select-none relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1.5 h-full bg-emerald-500"></div>
+                <div class="space-y-1 pl-1">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Fully Cleared</span>
+                    <div id="kpiFullyCleared" class="text-3xl font-bold text-emerald-600">0</div>
+                    <p class="text-xs text-slate-400">Auth + Clinically OK</p>
+                </div>
+                <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Metric 3: Pending Documentation -->
+            <div id="kpiCardPending" class="kpi-card bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between cursor-pointer hover:shadow-md transition-all select-none relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1.5 h-full bg-amber-500"></div>
+                <div class="space-y-1 pl-1">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pending Tasks</span>
+                    <div id="kpiPendingClearance" class="text-3xl font-bold text-amber-600">0</div>
+                    <p class="text-xs text-slate-400">Awaiting papers/labs</p>
+                </div>
+                <div class="p-3 bg-amber-50 text-amber-600 rounded-xl">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Metric 4: Critical holds / Denials -->
+            <div id="kpiCardCritical" class="kpi-card bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between cursor-pointer hover:shadow-md transition-all select-none relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1.5 h-full bg-rose-500"></div>
+                <div class="space-y-1 pl-1">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Critical Holds</span>
+                    <div id="kpiCriticalHolds" class="text-3xl font-bold text-rose-600">0</div>
+                    <p class="text-xs text-slate-400">Denied or Not Cleared</p>
+                </div>
+                <div class="p-3 bg-rose-50 text-rose-600 rounded-xl">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Toast Notification Alert -->
+        <div id="toastNotification" class="hidden fixed bottom-5 right-5 bg-slate-900 text-white text-sm px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 z-50 transition-all duration-300 transform translate-y-10 opacity-0">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span id="toastMessage">Data copied successfully!</span>
+        </div>
+
+        <!-- Multi-Patient Tracking Grid Container -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                
+                <!-- Interactive Visibility Toggle Group -->
+                <div class="flex items-center gap-3">
+                    <div class="inline-flex bg-slate-200/80 p-1 rounded-xl text-xs font-semibold shadow-inner border border-slate-300/40">
+                        <button id="tabActiveBtn" class="px-3.5 py-1.5 rounded-lg transition-all bg-white text-slate-800 shadow-sm">
+                            Active Pipeline
+                        </button>
+                        <button id="tabInactiveBtn" class="px-3.5 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900 ml-1">
+                            Post-Op Archive
+                        </button>
+                    </div>
+                    <span id="activeFilterBadge" class="text-[11px] font-medium bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full border border-indigo-100">Showing All Active</span>
+                </div>
+                
+                <span class="text-xs text-slate-400 bg-slate-200/60 px-2 py-1 rounded font-medium self-start sm:self-auto">Real-time Auto-calculating Grid</span>
+            </div>
+            
+            <div class="overflow-x-auto custom-scrollbar">
+                <table class="w-full text-left border-collapse min-w-[2300px]">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-semibold tracking-wider uppercase">
+                            <th class="py-3 px-4 w-48">Patient Details</th>
+                            <th class="py-3 px-4 w-36">Surgery Window</th>
+                            <th class="py-3 px-4 w-48">Primary Doctor / Phone</th>
+                            <th class="py-3 px-4 w-32">Pre-Op Visit</th>
+                            <th class="py-3 px-4 w-32">Post-Op Visit</th>
+                            <th class="py-3 px-4 w-44">Procedure / Description</th>
+                            <th class="py-3 px-4 w-40">Surg Location</th>
+                            <th class="py-3 px-4 w-36">Insurance</th>
+                            <th class="py-3 px-4 w-36">eCW Status</th>
+                            <th class="py-3 px-4 w-32">Authorization</th>
+                            <th class="py-3 px-4 w-36">Physician Clr</th>
+                            <th class="py-3 px-4 w-32">Anesthesia Clr</th>
+                            <th class="py-3 px-4 w-28">Labs</th>
+                            <th class="py-3 px-4 w-28">EKG</th>
+                            <th class="py-3 px-4 w-28">CXR</th>
+                            <th class="py-3 px-4 w-40">Last Updated</th>
+                            <th class="py-3 px-4 w-48">Notes / Actions</th>
+                            <th class="py-3 px-2 text-center w-12"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="patientTableBody" class="divide-y divide-slate-100 text-sm">
+                        <!-- Patient rows populated dynamically by Javascript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Setup initial structure with updated actual surgery facility names, medical record numbers (MRN), and insurance parameters
+        const initialPatients = [
+            { name: "Eleanor Vance", dob: "11/14/1965", mrn: "MRN-48218", insurance: "Blue Cross Blue Shield", datetime: "10/21 - 07:30 AM", pcp: "Dr. Robert Chen", pcpPhone: "(555) 019-2834", preOp: "10/14/2026", postOp: "11/04/2026", procedure: "ACDF", surgLocation: "Advanced", ecwStatus: "Ready for Surgery", auth: "Approved", phys: "Cleared", anesthesia: "Cleared", labs: "Done", ekg: "Done", cxr: "Done", notes: "All baseline packets scanned into eCW chart.", updatedAt: "10/19 - 09:15 AM" },
+            { name: "Marcus Brody", dob: "04/23/1978", mrn: "MRN-99427", insurance: "UnitedHealthcare", datetime: "10/21 - 09:15 AM", pcp: "Dr. Sarah Patel", pcpPhone: "(555) 014-4921", preOp: "10/12/2026", postOp: "11/04/2026", procedure: "Knee Scope", surgLocation: "Morton Plant", ecwStatus: "Scheduled", auth: "Pending", phys: "Cleared + Note", anesthesia: "Pending", labs: "Done", ekg: "Pending", cxr: "Pending", notes: "Awaiting fax confirmation from cardiac clearance.", updatedAt: "10/19 - 11:42 AM" },
+            { name: "Sarah Jenkins", dob: "09/02/1952", mrn: "MRN-10531", insurance: "Medicare Part B", datetime: "10/21 - 11:00 AM", pcp: "Dr. James Wilson", pcpPhone: "(555) 017-8833", preOp: "10/09/2026", postOp: "10/30/2026", procedure: "ESI", surgLocation: "Northside", ecwStatus: "Post Op", auth: "Approved", phys: "Cleared", anesthesia: "Cleared", labs: "Done", ekg: "Done", cxr: "Done", notes: "Surgery completed; chart drops to archive view.", updatedAt: "10/19 - 02:10 PM" },
+            { name: "David Miller", dob: "12/30/1984", mrn: "MRN-77312", insurance: "Aetna PPO", datetime: "10/22 - 08:00 AM", pcp: "Dr. Linda Groff", pcpPhone: "(555) 012-7744", preOp: "10/15/2026", postOp: "11/05/2026", procedure: "Rotator Cuff", surgLocation: "Palms", ecwStatus: "Scheduled", auth: "Denied", phys: "Pending", anesthesia: "Pending", labs: "Pending", ekg: "Pending", cxr: "Pending", notes: "Peer-to-peer scheduled for authorization appeal.", updatedAt: "10/19 - 08:22 AM" },
+            { name: "Clara Oswald", dob: "07/15/1991", mrn: "MRN-22849", insurance: "Cigna Healthcare", datetime: "10/22 - 10:30 AM", pcp: "Dr. Michael Chang", pcpPhone: "(555) 015-1122", preOp: "10/16/2026", postOp: "11/05/2026", procedure: "ALIF", surgLocation: "Saint Pete", ecwStatus: "Scheduled", auth: "N/A", phys: "Cleared", anesthesia: "Cleared", labs: "Done", ekg: "Done", cxr: "N/A", notes: "Self-pay cosmetic/unregulated case variance.", updatedAt: "10/19 - 10:05 AM" },
+            { name: "Arthur Pendragon", dob: "05/12/1970", mrn: "MRN-60621", insurance: "Humana Choice", datetime: "10/23 - 08:30 AM", pcp: "Dr. Gregory House", pcpPhone: "(555) 019-8811", preOp: "10/13/2026", postOp: "11/06/2026", procedure: "HIP", surgLocation: "Skyway", ecwStatus: "Scheduled", auth: "Approved", phys: "Pending", anesthesia: "Cleared", labs: "Done", ekg: "Pending", cxr: "Done", notes: "EKG completed; awaiting clearance note from pulmonology.", updatedAt: "10/19 - 01:14 PM" },
+            { name: "Gwen Stacy", dob: "02/28/1995", mrn: "MRN-33194", insurance: "Tricare Prime", datetime: "10/23 - 01:00 PM", pcp: "Dr. Curt Connors", pcpPhone: "(555) 011-2358", preOp: "10/19/2026", postOp: "11/06/2026", procedure: "Ankle Scope", surgLocation: "Morton Plant", ecwStatus: "Scheduled", auth: "Pending", phys: "Cleared", anesthesia: "Cleared", labs: "Pending", ekg: "Pending", cxr: "Pending", notes: "Pre-op labs in chart. Awaiting insurance auth.", updatedAt: "10/19 - 03:02 PM" }
+        ];
+
+        const proceduresList = [
+            "2 Stge", "ACDF", "ALIF", "Ankle OF", "Ankle Scope", "Clavicle ORIF", "Elbow Scope", 
+            "Elbow Tennis El", "ESI", "HIP", "KNEE", "Knee Scope", "Kypho", "Lumbar Spine", 
+            "Menisectomy", "Rotator Cuff", "SCOPE", "SCS", "Shoulder Scope", "TSA", "Wrist Scope"
+        ];
+
+        const locationsList = [
+            "Advanced", "Morton Plant", "Northside", "Palms", "Saint Pete", "Skyway"
+        ];
+
+        let currentPipelineFilter = 'all'; 
+        let currentVisibilityScope = 'active'; 
+        const tableBody = document.getElementById('patientTableBody');
+
+        // Render dynamic table rows with custom configurations
+        function createRowElement(patient = { name: "", dob: "", mrn: "", insurance: "", datetime: "", pcp: "", pcpPhone: "", preOp: "", postOp: "", procedure: "2 Stge", surgLocation: "Advanced", ecwStatus: "Scheduled", auth: "Pending", phys: "Pending", anesthesia: "Pending", labs: "Pending", ekg: "Pending", cxr: "Pending", notes: "", updatedAt: "" }) {
+            const tr = document.createElement('tr');
+            tr.className = "hover:bg-slate-50/70 transition-colors group";
+            
+            let procedureOptions = '';
+            proceduresList.forEach(proc => {
+                procedureOptions += `<option value="${proc}" ${patient.procedure === proc ? 'selected' : ''}>${proc}</option>`;
+            });
+
+            let locationOptions = '';
+            locationsList.forEach(loc => {
+                locationOptions += `<option value="${loc}" ${patient.surgLocation === loc ? 'selected' : ''}>${loc}</option>`;
+            });
+
+            tr.innerHTML = `
+                <td class="py-3 px-4">
+                    <input type="text" value="${patient.name}" placeholder="Patient Name" class="patient-name font-medium text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full text-sm py-0.5">
+                    <input type="text" value="${patient.dob}" placeholder="DOB (MM/DD/YYYY)" class="text-xs text-slate-500 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full mt-0.5">
+                    <input type="text" value="${patient.mrn || ''}" placeholder="MR Number" class="patient-mrn text-[11px] text-slate-400 font-mono tracking-tight bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full mt-0.5">
+                </td>
+                <td class="py-3 px-4">
+                    <input type="text" value="${patient.datetime}" placeholder="Date / Time slot" class="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full text-xs text-slate-600 font-medium">
+                </td>
+                <td class="py-3 px-4">
+                    <input type="text" value="${patient.pcp || ''}" placeholder="Dr. Name" class="pcp-name font-medium text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full text-xs py-0.5">
+                    <input type="text" value="${patient.pcpPhone || ''}" placeholder="Phone Number" class="pcp-phone text-xs text-slate-500 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full mt-0.5">
+                </td>
+                <td class="py-3 px-4">
+                    <input type="text" value="${patient.preOp || ''}" placeholder="MM/DD/YYYY" class="preop-date text-xs text-slate-700 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full font-medium py-1">
+                </td>
+                <td class="py-3 px-4">
+                    <input type="text" value="${patient.postOp || ''}" placeholder="MM/DD/YYYY" class="postop-date text-xs text-slate-700 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full font-medium py-1">
+                </td>
+                <td class="py-3 px-4">
+                    <select class="procedure-select bg-white border border-slate-200 rounded-lg px-2 py-1.5 w-full text-xs font-medium text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none">
+                        ${procedureOptions}
+                    </select>
+                </td>
+                <td class="py-3 px-4">
+                    <select class="location-select bg-white border border-slate-200 rounded-lg px-2 py-1.5 w-full text-xs font-medium text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none">
+                        ${locationOptions}
+                    </select>
+                </td>
+                <td class="py-3 px-4">
+                    <input type="text" value="${patient.insurance || ''}" placeholder="Payer / Carrier" class="patient-insurance text-xs text-slate-700 font-medium bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full py-1.5">
+                </td>
+                <td class="py-3 px-4">
+                    <select class="ecw-status bg-white border border-slate-200 rounded-lg px-2 py-1.5 w-full text-xs font-medium text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none">
+                        <option value="Scheduled" ${patient.ecwStatus === 'Scheduled' ? 'selected' : ''}>📅 Scheduled</option>
+                        <option value="Pending" ${patient.ecwStatus === 'Pending' ? 'selected' : ''}>⏳ Pending</option>
+                        <option value="Ready for Surgery" ${patient.ecwStatus === 'Ready for Surgery' ? 'selected' : ''}>✅ Ready for Surgery</option>
+                        <option value="Post Op" ${patient.ecwStatus === 'Post Op' ? 'selected' : ''}>🩺 Post Op</option>
+                        <option value="Rescheduled" ${patient.ecwStatus === 'Rescheduled' ? 'selected' : ''}>🔄 Rescheduled</option>
+                        <option value="Cancelled" ${patient.ecwStatus === 'Cancelled' ? 'selected' : ''}>❌ Cancelled</option>
+                    </select>
+                </td>
+                <td class="py-3 px-4">
+                    <select class="clearance-select bg-white border border-slate-200 rounded-lg px-2 py-1.5 w-full text-xs font-semibold shadow-sm focus:outline-none transition-all">
+                        <option value="Pending" ${patient.auth === 'Pending' ? 'selected' : ''}>Pending</option>
+                        <option value="Approved" ${patient.auth === 'Approved' ? 'selected' : ''}>Approved</option>
+                        <option value="Denied" ${patient.auth === 'Denied' ? 'selected' : ''}>Denied</option>
+                        <option value="N/A" ${patient.auth === 'N/A' ? 'selected' : ''}>N/A</option>
+                    </select>
+                </td>
+                <td class="py-3 px-4">
+                    <select class="clearance-select bg-white border border-slate-200 rounded-lg px-2 py-1.5 w-full text-xs font-semibold shadow-sm focus:outline-none transition-all">
+                        <option value="Cleared" ${patient.phys === 'Cleared' ? 'selected' : ''}>Cleared</option>
+                        <option value="Pending" ${patient.phys === 'Pending' ? 'selected' : ''}>Pending</option>
+                        <option value="Cleared + Note" ${patient.phys === 'Cleared + Note' ? 'selected' : ''}>Cleared + Note</option>
+                        <option value="N/A" ${patient.phys === 'N/A' ? 'selected' : ''}>N/A</option>
+                    </select>
+                </td>
+                <td class="py-3 px-4">
+                    <select class="clearance-select bg-white border border-slate-200 rounded-lg px-2 py-1.5 w-full text-xs font-semibold shadow-sm focus:outline-none transition-all">
+                        <option value="Pending" ${patient.anesthesia === 'Pending' ? 'selected' : ''}>Pending</option>
+                        <option value="Cleared" ${patient.anesthesia === 'Cleared' ? 'selected' : ''}>Cleared</option>
+                        <option value="Not Cleared" ${patient.anesthesia === 'Not Cleared' ? 'selected' : ''}>Not Cleared</option>
+                        <option value="N/A" ${patient.anesthesia === 'N/A' ? 'selected' : ''}>N/A</option>
+                    </select>
+                </td>
+                <td class="py-3 px-4">
+                    <select class="diagnostic-select bg-white border border-slate-200 rounded-lg px-2 py-1.5 w-full text-xs font-semibold shadow-sm focus:outline-none transition-all">
+                        <option value="Pending" ${patient.labs === 'Pending' ? 'selected' : ''}>Pending</option>
+                        <option value="Done" ${patient.labs === 'Done' ? 'selected' : ''}>Done</option>
+                        <option value="N/A" ${patient.labs === 'N/A' ? 'selected' : ''}>N/A</option>
+                    </select>
+                </td>
+                <td class="py-3 px-4">
+                    <select class="diagnostic-select bg-white border border-slate-200 rounded-lg px-2 py-1.5 w-full text-xs font-semibold shadow-sm focus:outline-none transition-all">
+                        <option value="Pending" ${patient.ekg === 'Pending' ? 'selected' : ''}>Pending</option>
+                        <option value="Done" ${patient.ekg === 'Done' ? 'selected' : ''}>Done</option>
+                        <option value="N/A" ${patient.ekg === 'N/A' ? 'selected' : ''}>N/A</option>
+                    </select>
+                </td>
+                <td class="py-3 px-4">
+                    <select class="diagnostic-select bg-white border border-slate-200 rounded-lg px-2 py-1.5 w-full text-xs font-semibold shadow-sm focus:outline-none transition-all">
+                        <option value="Pending" ${patient.cxr === 'Pending' ? 'selected' : ''}>Pending</option>
+                        <option value="Done" ${patient.cxr === 'Done' ? 'selected' : ''}>Done</option>
+                        <option value="N/A" ${patient.cxr === 'N/A' ? 'selected' : ''}>N/A</option>
+                    </select>
+                </td>
+                <td class="py-3 px-4">
+                    <span class="last-updated text-[11px] font-mono text-slate-500 bg-slate-100 border border-slate-200/80 px-2 py-1 rounded-md block text-center tracking-tight select-none">
+                        ${patient.updatedAt || 'Not Edited'}
+                    </span>
+                </td>
+                <td class="py-3 px-4">
+                    <input type="text" value="${patient.notes}" placeholder="Add scheduling flags..." class="patient-notes bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full text-xs text-slate-500">
+                </td>
+                <td class="py-3 px-2 text-center">
+                    <button class="delete-row-btn text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 p-1" title="Remove row">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                </td>
+            `;
+
+            tr.querySelectorAll('select.clearance-select').forEach(select => {
+                select.addEventListener('change', () => {
+                    applyConditionalFormatting(select);
+                    recalculateMetrics();
+                });
+                applyConditionalFormatting(select);
+            });
+
+            tr.querySelectorAll('select.diagnostic-select').forEach(select => {
+                select.addEventListener('change', () => {
+                    applyConditionalFormatting(select);
+                    recalculateMetrics();
+                });
+                applyConditionalFormatting(select);
+            });
+
+            // Wire up row edit events to refresh the "Last Updated" timestamp field
+            tr.addEventListener('input', (e) => {
+                triggerAutomatedTimestamp(tr);
+                recalculateMetrics();
+            });
+            tr.querySelectorAll('select').forEach(select => {
+                select.addEventListener('change', () => {
+                    triggerAutomatedTimestamp(tr);
+                });
+            });
+            
+            tr.querySelector('.delete-row-btn').addEventListener('click', () => {
+                tr.remove();
+                recalculateMetrics();
+                showToast("Patient record removed from active view.", "slate");
+            });
+
+            return tr;
+        }
+
+        function triggerAutomatedTimestamp(rowElement) {
+            const timestampLabel = rowElement.querySelector('.last-updated');
+            if (timestampLabel) {
+                const now = new Date();
+                const hours = now.getHours();
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                const formattedHours = hours % 12 || 12;
+                const formattedMonth = String(now.getMonth() + 1).padStart(2, '0');
+                const formattedDay = String(now.getDate()).padStart(2, '0');
+                
+                timestampLabel.textContent = `${formattedMonth}/${formattedDay} - ${formattedHours}:${minutes} ${ampm}`;
+            }
+        }
+
+        function applyConditionalFormatting(selectElement) {
+            const val = selectElement.value;
+            selectElement.classList.remove('bg-green-50', 'text-green-700', 'border-green-200',
+                                            'bg-red-50', 'text-red-700', 'border-red-200',
+                                            'bg-amber-50', 'text-amber-700', 'border-amber-200',
+                                            'bg-slate-100', 'text-slate-500', 'border-slate-200');
+
+            if (val === 'Approved' || val === 'Cleared' || val === 'Done' || val === 'Cleared + Note') {
+                selectElement.classList.add('bg-green-50', 'text-green-700', 'border-green-200');
+            } else if (val === 'Denied' || val === 'Not Cleared') {
+                selectElement.classList.add('bg-red-50', 'text-red-700', 'border-red-200');
+            } else if (val === 'Pending') {
+                selectElement.classList.add('bg-amber-50', 'text-amber-700', 'border-amber-200');
+            } else if (val === 'N/A') {
+                selectElement.classList.add('bg-slate-100', 'text-slate-500', 'border-slate-200');
+            }
+        }
+
+        function setPipelineFilter(filterType) {
+            currentPipelineFilter = filterType;
+            
+            document.querySelectorAll('.kpi-card').forEach(card => {
+                card.classList.remove('border-indigo-500', 'border-emerald-500', 'border-amber-500', 'border-rose-500');
+                card.classList.add('border-slate-200');
+            });
+
+            const badge = document.getElementById('activeFilterBadge');
+            badge.classList.remove('bg-indigo-50', 'text-indigo-700', 'border-indigo-100',
+                                    'bg-emerald-50', 'text-emerald-700', 'border-emerald-100',
+                                    'bg-amber-50', 'text-amber-700', 'border-amber-100',
+                                    'bg-rose-50', 'text-rose-700', 'border-rose-100');
+
+            const contextPrefix = currentVisibilityScope === 'active' ? "Active" : "Archived";
+
+            if (filterType === 'all') {
+                document.getElementById('kpiCardAll').classList.remove('border-slate-200');
+                document.getElementById('kpiCardAll').classList.add('border-indigo-500');
+                badge.innerText = `Showing All ${contextPrefix}`;
+                badge.classList.add('bg-indigo-50', 'text-indigo-700', 'border-indigo-100');
+            } else if (filterType === 'cleared') {
+                document.getElementById('kpiCardCleared').classList.remove('border-slate-200');
+                document.getElementById('kpiCardCleared').classList.add('border-emerald-500');
+                badge.innerText = `Filter: Cleared ${contextPrefix} Cases`;
+                badge.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-100');
+            } else if (filterType === 'pending') {
+                document.getElementById('kpiCardPending').classList.remove('border-slate-200');
+                document.getElementById('kpiCardPending').classList.add('border-amber-500');
+                badge.innerText = `Filter: Pending Tasks (${contextPrefix})`;
+                badge.classList.add('bg-amber-50', 'text-amber-700', 'border-amber-100');
+            } else if (filterType === 'critical') {
+                document.getElementById('kpiCardCritical').classList.remove('border-slate-200');
+                document.getElementById('kpiCardCritical').classList.add('border-rose-500');
+                badge.innerText = `Filter: Critical Holds (${contextPrefix})`;
+                badge.classList.add('bg-rose-50', 'text-rose-700', 'border-rose-100');
+            }
+
+            recalculateMetrics();
+        }
+
+        function changeVisibilityScope(scope) {
+            currentVisibilityScope = scope;
+            const activeBtn = document.getElementById('tabActiveBtn');
+            const inactiveBtn = document.getElementById('tabInactiveBtn');
+            const totalLabel = document.getElementById('kpiTotalLabel');
+
+            if (scope === 'active') {
+                activeBtn.className = "px-3.5 py-1.5 rounded-lg transition-all bg-white text-slate-800 shadow-sm";
+                inactiveBtn.className = "px-3.5 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900 ml-1";
+                totalLabel.innerText = "Active Pre-Op Records";
+                showToast("Viewing active scheduling pipeline.", "success");
+            } else {
+                inactiveBtn.className = "px-3.5 py-1.5 rounded-lg transition-all bg-white text-slate-800 shadow-sm ml-1";
+                activeBtn.className = "px-3.5 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900";
+                totalLabel.innerText = "Archived Post-Op Records";
+                showToast("Viewing inactive Post-Op chart archive.", "success");
+            }
+
+            setPipelineFilter(currentPipelineFilter);
+        }
+
+        function recalculateMetrics() {
+            const rows = tableBody.querySelectorAll('tr');
+            let totalPatients = 0;
+            let fullyClearedCount = 0;
+            let pendingCount = 0;
+            let criticalHoldsCount = 0;
+
+            rows.forEach(row => {
+                const nameInput = row.querySelector('.patient-name');
+                if (nameInput && nameInput.value.trim() !== "") {
+                    const ecwVal = row.querySelector('.ecw-status').value;
+
+                    if (currentVisibilityScope === 'active') {
+                        if (ecwVal === 'Post Op') {
+                            row.style.display = 'none';
+                            return; 
+                        }
+                    } else {
+                        if (ecwVal !== 'Post Op') {
+                            row.style.display = 'none';
+                            return;
+                        }
+                    }
+
+                    totalPatients++;
+
+                    const clearances = row.querySelectorAll('select.clearance-select');
+                    const diagnostics = row.querySelectorAll('select.diagnostic-select');
+                    
+                    if (clearances.length === 3 && diagnostics.length === 3) {
+                        const authVal = clearances[0].value;
+                        const physVal = clearances[1].value;
+                        const anesVal = clearances[2].value;
+                        
+                        const labsVal = diagnostics[0].value;
+                        const ekgVal = diagnostics[1].value;
+                        const cxrVal = diagnostics[2].value;
+
+                        const authOk = (authVal === 'Approved' || authVal === 'N/A');
+                        const physOk = (physVal === 'Cleared' || physVal === 'Cleared + Note' || physVal === 'N/A');
+                        const anesOk = (anesVal === 'Cleared' || anesVal === 'N/A');
+                        const labsOk = (labsVal === 'Done' || labsVal === 'N/A');
+                        const ekgOk = (ekgVal === 'Done' || ekgVal === 'N/A');
+                        const cxrOk = (cxrVal === 'Done' || cxrVal === 'N/A');
+                        
+                        const isCleared = authOk && physOk && anesOk && labsOk && ekgOk && cxrOk;
+
+                        if (isCleared) fullyClearedCount++;
+
+                        const isCritical = (authVal === 'Denied' || physVal === 'Not Cleared' || anesVal === 'Not Cleared');
+                        if (isCritical) criticalHoldsCount++;
+
+                        const isPending = !isCleared && !isCritical;
+                        if (isPending) pendingCount++;
+
+                        let shouldDisplay = false;
+                        if (currentPipelineFilter === 'all') shouldDisplay = true;
+                        else if (currentPipelineFilter === 'cleared' && isCleared) shouldDisplay = true;
+                        else if (currentPipelineFilter === 'pending' && isPending) shouldDisplay = true;
+                        else if (currentPipelineFilter === 'critical' && isCritical) shouldDisplay = true;
+
+                        row.style.display = shouldDisplay ? '' : 'none';
+                    }
+                }
+            });
+
+            document.getElementById('kpiTotalPatients').innerText = totalPatients;
+            document.getElementById('kpiFullyCleared').innerText = fullyClearedCount;
+            document.getElementById('kpiPendingClearance').innerText = pendingCount;
+            document.getElementById('kpiCriticalHolds').innerText = criticalHoldsCount;
+        }
+
+        // Automated Text Summary Parsing Engine
+        function importPipelineData(text) {
+            if (!text || text.trim() === "") {
+                showToast("Please paste a valid text summary first.", "slate");
+                return;
+            }
+
+            const lines = text.split('\n');
+            const parsedPatients = [];
+
+            lines.forEach(line => {
+                if (!line.includes('Patient #')) return;
+
+                try {
+                    const patientObj = {};
+                    const parts = line.split('|').map(p => p.trim());
+                    
+                    // Parse Part 0: "Patient #X: Name (MRN: XYZ)"
+                    const part0 = parts[0];
+                    const nameMatch = part0.match(/Patient #\d+:\s*(.*?)\s*\(MRN:\s*(.*?)\)/);
+                    if (nameMatch) {
+                        patientObj.name = nameMatch[1];
+                        patientObj.mrn = nameMatch[2];
+                    } else {
+                        patientObj.name = part0.replace(/Patient #\d+:\s*/, '').trim();
+                        patientObj.mrn = '';
+                    }
+
+                    // Parse other explicit attributes dynamically
+                    parts.forEach(part => {
+                        const clean = part.trim();
+                        if (clean.startsWith('Insurance:')) patientObj.insurance = clean.replace('Insurance:', '').trim();
+                        if (clean.startsWith('PCP:')) {
+                            const pcpStr = clean.replace('PCP:', '').trim();
+                            const lastOpen = pcpStr.lastIndexOf('(');
+                            const lastClose = pcpStr.lastIndexOf(')');
+                            if (lastOpen !== -1 && lastClose !== -1 && lastClose > lastOpen) {
+                                patientObj.pcp = pcpStr.substring(0, lastOpen).trim();
+                                patientObj.pcpPhone = pcpStr.substring(lastOpen + 1, lastClose).trim();
+                            } else {
+                                patientObj.pcp = pcpStr;
+                                patientObj.pcpPhone = '';
+                            }
+                        }
+                        if (clean.startsWith('Pre-Op:')) patientObj.preOp = clean.replace('Pre-Op:', '').trim();
+                        if (clean.startsWith('Post-Op:')) patientObj.postOp = clean.replace('Post-Op:', '').trim();
+                        if (clean.startsWith('Proc:')) patientObj.procedure = clean.replace('Proc:', '').trim();
+                        if (clean.startsWith('Location:')) patientObj.surgLocation = clean.replace('Location:', '').trim();
+                        if (clean.startsWith('Status:')) patientObj.ecwStatus = clean.replace('Status:', '').trim();
+                        if (clean.startsWith('Auth:')) patientObj.auth = clean.replace('Auth:', '').trim();
+                        if (clean.startsWith('Phys:')) patientObj.phys = clean.replace('Phys:', '').trim();
+                        if (clean.startsWith('Anes:')) patientObj.anesthesia = clean.replace('Anes:', '').trim();
+                        if (clean.startsWith('Labs:')) patientObj.labs = clean.replace('Labs:', '').trim();
+                        if (clean.startsWith('EKG:')) patientObj.ekg = clean.replace('EKG:', '').trim();
+                        if (clean.startsWith('CXR:')) patientObj.cxr = clean.replace('CXR:', '').trim();
+                        if (clean.startsWith('Last Updated:')) patientObj.updatedAt = clean.replace('Last Updated:', '').trim();
+                    });
+
+                    // Extract Notes / Actions row value if it was written out
+                    const notesPart = parts.find(p => p.trim().startsWith('Notes:'));
+                    if (notesPart) {
+                        patientObj.notes = notesPart.trim().replace('Notes:', '').trim();
+                    } else {
+                        // Attempt fallback calculation from the last part if unlabelled
+                        const lastPart = parts[parts.length - 1];
+                        if (lastPart && !lastPart.includes(':') && parts.length > 14) {
+                            patientObj.notes = lastPart.trim();
+                        } else {
+                            patientObj.notes = '';
+                        }
+                    }
+
+                    if (patientObj.name) {
+                        parsedPatients.push(patientObj);
+                    }
+                } catch (err) {
+                    console.error("Failed to parse summary row line item:", line, err);
+                }
+            });
+
+            if (parsedPatients.length > 0) {
+                tableBody.innerHTML = ''; // Safely overwrite local storage rows view
+                parsedPatients.forEach(p => {
+                    tableBody.appendChild(createRowElement(p));
+                });
+                recalculateMetrics();
+                document.getElementById('importPanel').classList.add('hidden');
+                document.getElementById('importTextArea').value = '';
+                showToast(`Loaded ${parsedPatients.length} patient charts successfully!`, "success");
+            } else {
+                showToast("No valid chart logs recognized in text block.", "slate");
+            }
+        }
+
+        function showToast(message, type = "success") {
+            const toast = document.getElementById('toastNotification');
+            const msg = document.getElementById('toastMessage');
+            msg.innerText = message;
+            
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.remove('translate-y-10', 'opacity-0');
+            }, 50);
+
+            setTimeout(() => {
+                toast.classList.add('translate-y-10', 'opacity-0');
+                setTimeout(() => {
+                    toast.classList.add('hidden');
+                }, 300);
+            }, 3000);
+        }
+
+        initialPatients.forEach(p => {
+            tableBody.appendChild(createRowElement(p));
+        });
+        recalculateMetrics();
+
+        document.getElementById('tabActiveBtn').addEventListener('click', () => changeVisibilityScope('active'));
+        document.getElementById('tabInactiveBtn').addEventListener('click', () => changeVisibilityScope('inactive'));
+
+        document.getElementById('kpiCardAll').addEventListener('click', () => setPipelineFilter('all'));
+        document.getElementById('kpiCardCleared').addEventListener('click', () => setPipelineFilter('cleared'));
+        document.getElementById('kpiCardPending').addEventListener('click', () => setPipelineFilter('pending'));
+        document.getElementById('kpiCardCritical').addEventListener('click', () => setPipelineFilter('critical'));
+
+        document.getElementById('addRowBtn').addEventListener('click', () => {
+            const newRow = createRowElement();
+            tableBody.appendChild(newRow);
+            newRow.querySelector('.patient-name').focus();
+            recalculateMetrics();
+            showToast("Blank record row appended to tracker.", "success");
+        });
+
+        // Wire up toggle handles for the newly integrated text data import drawer
+        document.getElementById('toggleImportBtn').addEventListener('click', () => {
+            const panel = document.getElementById('importPanel');
+            panel.classList.toggle('hidden');
+            if (!panel.classList.contains('hidden')) {
+                document.getElementById('importTextArea').focus();
+            }
+        });
+
+        document.getElementById('cancelImportBtn').addEventListener('click', () => {
+            document.getElementById('importPanel').classList.add('hidden');
+            document.getElementById('importTextArea').value = '';
+        });
+
+        document.getElementById('executeImportBtn').addEventListener('click', () => {
+            const bulkText = document.getElementById('importTextArea').value;
+            importPipelineData(bulkText);
+        });
+
+        document.getElementById('copySummaryBtn').addEventListener('click', () => {
+            const rows = tableBody.querySelectorAll('tr');
+            let clipText = "eCW SURGERY PIPELINE CLEAR SUMMARY\n=====================================\n";
+            
+            rows.forEach((row, index) => {
+                const name = row.querySelector('.patient-name')?.value || "Unnamed";
+                if(name !== "Unnamed" && name.trim() !== "") {
+                    const mrn = row.querySelector('.patient-mrn')?.value || "N/A";
+                    const insurance = row.querySelector('.patient-insurance')?.value || "N/A";
+                    const ecw = row.querySelector('.ecw-status')?.value;
+                    const proc = row.querySelector('.procedure-select')?.value || "";
+                    const loc = row.querySelector('.location-select')?.value || "";
+                    const pcp = row.querySelector('.pcp-name')?.value || "";
+                    const pcpPhone = row.querySelector('.pcp-phone')?.value || "";
+                    const preOp = row.querySelector('.preop-date')?.value || "";
+                    const postOp = row.querySelector('.postop-date')?.value || "";
+                    const lastUpdated = row.querySelector('.last-updated')?.textContent.trim() || "";
+                    const clearances = row.querySelectorAll('select.clearance-select');
+                    const diagnostics = row.querySelectorAll('select.diagnostic-select');
+                    const notes = row.querySelector('.patient-notes')?.value || "";
+                    clipText += `Patient #${index+1}: ${name} (MRN: ${mrn}) | Insurance: ${insurance} | PCP: ${pcp} (${pcpPhone}) | Pre-Op: ${preOp} | Post-Op: ${postOp} | Proc: ${proc} | Location: ${loc} | Status: ${ecw} | Auth: ${clearances[0]?.value} | Phys: ${clearances[1]?.value} | Anes: ${clearances[2]?.value} | Labs: ${diagnostics[0]?.value} | EKG: ${diagnostics[1]?.value} | CXR: ${diagnostics[2]?.value} | Last Updated: ${lastUpdated} | Notes: ${notes}\n`;
+                }
+            });
+
+            const textarea = document.createElement('textarea');
+            textarea.value = clipText;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+
+            showToast("Active pipeline dataset copied to system clipboard!", "success");
+        });
+    </script>
+</body>
+</html>
